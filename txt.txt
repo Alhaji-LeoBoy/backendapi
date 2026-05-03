@@ -1,0 +1,24 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "sql/schema/schema_users.sql"
+      - "sql/schema/schema_tokens.sql"  # include the tokens table
+    queries:
+      - "sql/queries/users.sql"
+      - "sql/queries/tokens.sql"       # optional: if you create token queries
+    gen:
+      go:
+        package: "db"
+        out: "db"
+        sql_package: "pgx/v5"
+        emit_interface: true
+        emit_empty_slices: true
+        emit_exact_table_names: false
+        emit_json_tags: true
+
+
+go run . --seed
+go run ./mockdata/cmd/
+
+backendapi-production-9a9d.up.railway.app

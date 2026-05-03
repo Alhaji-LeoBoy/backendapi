@@ -1,0 +1,21 @@
+{
+  "access_token": "JY42D44Y3BGO7KIQITRYJUUL6HF254LGD4VGVCZ3TUAC4BNW55XA",
+  "refresh_token": "7CEHP4P3MXPWHGLEMBN4RSKV35DRHRW4NVMVWVWYDNRBEGOPU7BQ",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "user": {
+    "id": 1,
+    "username": "Alhaji Kanu",
+    "email": "kanu@gmail.com"
+  }
+
+  {
+  "access_token": "UUYUJJG2JGA53T4FWQCBJYVKZHFTVL4JCZKTXWWUNHFHLHIHMU4Q",
+  "expires_in": 900,
+  "refresh_token": "PZTYCNSIV4GZL2FBKMQ2KL5HOZYQGVPB4BWULY354VBDG4V7MGSQ",
+  "token_type": "Bearer"
+}
+}
+
+
+flutter run --dart-define=BASE_URL=https://0mjqc68z-8080.euw.devtunnels.ms/

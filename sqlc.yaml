@@ -1,0 +1,23 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema:
+      - "sql/schema/schema_users.sql"
+      - "sql/schema/schema_tokens.sql"
+      - "sql/schema/schema_events.sql"
+      - "sql/schema/schema_tickets.sql"
+      - "sql/schema/schema_transactions.sql"
+    queries:
+      - "sql/queries/users.sql"
+      - "sql/queries/tokens.sql"
+      - "sql/queries/events.sql"
+      - "sql/queries/tickets.sql"
+      - "sql/queries/transactions.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        emit_interface: true
+        emit_empty_slices: true
+        emit_exact_table_names: false
+        emit_json_tags: true

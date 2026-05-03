@@ -1,0 +1,26 @@
+# ===== Go =====
+/bin/
+/pkg/
+*.exe
+*.out
+
+# ===== Database =====
+#app.db
+
+# ===== Uploads =====
+#uploads/
+
+# ===== Env =====
+.env
+
+# ===== macOS =====
+.DS_Store
+
+# ===== Flutter (ignored completely)
+flutter_application/
+
+# Optional
+.vscode/
+.idea/
+
+# git restore --staged .

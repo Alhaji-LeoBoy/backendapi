@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  owner_name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  location TEXT NOT NULL,
+  start_time DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
+CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);
+
+CREATE TRIGGER IF NOT EXISTS events_updated_at_trigger
+AFTER UPDATE ON events
+FOR EACH ROW
+BEGIN
+  UPDATE events SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;

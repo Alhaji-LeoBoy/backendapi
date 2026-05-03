@@ -1,0 +1,187 @@
+package utils
+
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"strings"
+)
+
+// ValidateClientInput validates that a struct has all required fields filled
+func ValidateClientInput(data interface{}) (bool, error) {
+	// Validate that all required fields are provided using reflection
+	if data == nil {
+		return false, fmt.Errorf("data cannot be nil")
+	}
+
+	// Get the reflect.Value
+	val := reflect.ValueOf(data)
+
+	// If it's a pointer, get the underlying element
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return false, fmt.Errorf("data pointer cannot be nil")
+		}
+		val = val.Elem()
+	}
+
+	// Ensure we're working with a struct
+	if val.Kind() != reflect.Struct {
+		return false, fmt.Errorf("data must be a struct or pointer to struct")
+	}
+
+	valType := val.Type()
+
+	// Iterate through all fields
+	for i := 0; i < val.NumField(); i++ {
+		field := valType.Field(i)
+		fieldValue := val.Field(i)
+
+		// skip id field
+		if field.Name == "ID" {
+			continue
+		}
+
+		// Get the json tag
+		jsonTag := field.Tag.Get("json")
+
+		// Skip fields without json tags or explicitly omitted
+		if jsonTag == "" || jsonTag == "-" {
+			continue
+		}
+
+		// Check if field can be accessed
+		if !fieldValue.CanInterface() {
+			return false, fmt.Errorf("field '%s' is not supported or not part of this form or request", jsonTag)
+		}
+
+		// Check if the field is empty
+		if isFieldEmpty(fieldValue) {
+			return false, fmt.Errorf("field '%s' is required but empty", jsonTag)
+		}
+	}
+
+	return true, nil
+}
+
+// ValidateJSONFields validates that JSON data only contains allowed fields
+func ValidateJSONFields(jsonData []byte, model interface{}) (bool, error) {
+	if len(jsonData) == 0 {
+		return false, fmt.Errorf("JSON data cannot be empty")
+	}
+
+	// Get allowed fields from the model
+	allowedFields := GetAllowedFields(model)
+
+	// Parse JSON into a map to check field names
+	var inputMap map[string]interface{}
+	if err := json.Unmarshal(jsonData, &inputMap); err != nil {
+		return false, fmt.Errorf("invalid JSON format: %v", err)
+	}
+
+	// Check for extra fields
+	for fieldName := range inputMap {
+		// Skip the ID field if present in input
+		if fieldName == "id" || fieldName == "ID" {
+			continue
+		}
+
+		if !allowedFields[fieldName] {
+			return false, fmt.Errorf("field '%s' is not supported or not part of this form or request", fieldName)
+		}
+	}
+
+	return true, nil
+}
+
+// getAllowedFields extracts all JSON field names from a struct
+func GetAllowedFields(model interface{}) map[string]bool {
+	allowed := make(map[string]bool)
+
+	if model == nil {
+		return allowed
+	}
+
+	valType := reflect.TypeOf(model)
+
+	// If it's a pointer, get the underlying element
+	if valType.Kind() == reflect.Ptr {
+		valType = valType.Elem()
+	}
+
+	// Ensure we're working with a struct
+	if valType.Kind() != reflect.Struct {
+		return allowed
+	}
+
+	// Iterate through all fields
+	for i := 0; i < valType.NumField(); i++ {
+		field := valType.Field(i)
+
+		// skip id field
+		if field.Name == "ID" {
+			continue
+		}
+
+		// Get the json tag
+		jsonTag := field.Tag.Get("json")
+
+		// Handle cases like "fieldname,omitempty"
+		if jsonTag != "" && jsonTag != "-" {
+			// Split by comma and take first part
+			tagParts := strings.Split(jsonTag, ",")
+			mainTag := tagParts[0]
+			if mainTag != "" {
+				allowed[mainTag] = true
+			}
+		}
+	}
+
+	return allowed
+}
+
+// isFieldEmpty checks if a field value is empty/zero
+func isFieldEmpty(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String:
+		return v.String() == ""
+	case reflect.Ptr, reflect.Interface:
+		return v.IsNil()
+	case reflect.Slice, reflect.Map, reflect.Chan:
+		return v.Len() == 0
+	case reflect.Struct:
+		// For structs, check if all fields are zero
+		return isStructEmpty(v)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Invalid:
+		return true
+	default:
+		// For other types, use the safe comparison
+		if v.CanInterface() {
+			return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
+		}
+		return false
+	}
+}
+
+// isStructEmpty checks if all fields in a struct are empty
+func isStructEmpty(v reflect.Value) bool {
+	for i := 0; i < v.NumField(); i++ {
+		fieldValue := v.Field(i)
+		// Skip unexported fields for deep checking
+		if !fieldValue.CanInterface() {
+			continue
+		}
+		if !isFieldEmpty(fieldValue) {
+			return false
+		}
+	}
+	return true
+}
