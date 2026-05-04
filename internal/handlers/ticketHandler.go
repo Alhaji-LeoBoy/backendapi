@@ -94,6 +94,11 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cache Invalidation
+	h.cache.Delete(r.Context(), fmt.Sprintf("userTickets:userId=%d", authUser.ID))
+	h.cache.Delete(r.Context(), fmt.Sprintf("event:%d:tickets", req.EventID))
+	h.cache.DeleteByPattern(r.Context(), "tickets:") // Invalidate admin/generic list
+
 	utils.RespondWithJSON(w, http.StatusCreated, map[string]interface{}{
 		"ticket": ticket,
 	})
@@ -299,6 +304,7 @@ func (h *TicketHandler) VerifyTicket(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
 		"ticket_id":        detailed.ID,
+		"event_id":         detailed.EventID,
 		"valid":            valid,
 		"status":           detailed.Status,
 		"name":             detailed.Name,
@@ -388,6 +394,11 @@ func (h *TicketHandler) MarkTicketUsed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cache Invalidation
+	h.cache.Delete(r.Context(), fmt.Sprintf("userTickets:userId=%d", ticket.UserID))
+	h.cache.Delete(r.Context(), fmt.Sprintf("event:%d:tickets", ticket.EventID))
+	h.cache.DeleteByPattern(r.Context(), "tickets:")
+
 	utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "ticket marked as used",
 		"ticket":  updated,
@@ -421,6 +432,14 @@ func (h *TicketHandler) DeleteTicket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	// Cache Invalidation (Prefix-based or specific if we had the ticket data here)
+	// Since we don't have ticket.UserID easily here without another query, 
+	// we'll at least clear the generic list. 
+	// Ideally DeleteTicket would fetch the ticket first to get IDs for cache clearing.
+	h.cache.DeleteByPattern(r.Context(), "tickets:")
+	h.cache.DeleteByPattern(r.Context(), "event:")
+	h.cache.DeleteByPattern(r.Context(), "userTickets:")
 
 	utils.RespondWithJSON(w, http.StatusOK, map[string]string{
 		"message": "ticket deleted successfully",
