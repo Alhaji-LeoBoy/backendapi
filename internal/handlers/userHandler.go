@@ -303,14 +303,24 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Admins see full user info (email + is_admin) so the admin panel can manage roles.
+	caller, ok := middleware.GetUserFromContext(r.Context())
+	isAdminCaller := ok && caller.IsAdmin
+
 	publicUsers := make([]map[string]any, len(users))
 	for i, u := range users {
-		publicUsers[i] = map[string]any{
+		row := map[string]any{
 			"id":         u.ID,
 			"username":   u.Username,
 			"bio":        u.Bio,
 			"created_at": u.CreatedAt,
 		}
+		if isAdminCaller {
+			row["email"] = u.Email
+			row["is_admin"] = u.IsAdmin
+			row["updated_at"] = u.UpdatedAt
+		}
+		publicUsers[i] = row
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
@@ -356,15 +366,24 @@ func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return limited public info
+	// Admins see full user info so the admin panel search works correctly.
+	caller, ok := middleware.GetUserFromContext(r.Context())
+	isAdminCaller := ok && caller.IsAdmin
+
 	publicUsers := make([]map[string]any, len(users))
 	for i, u := range users {
-		publicUsers[i] = map[string]any{
+		row := map[string]any{
 			"id":         u.ID,
 			"username":   u.Username,
 			"bio":        u.Bio,
 			"created_at": u.CreatedAt,
 		}
+		if isAdminCaller {
+			row["email"] = u.Email
+			row["is_admin"] = u.IsAdmin
+			row["updated_at"] = u.UpdatedAt
+		}
+		publicUsers[i] = row
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
