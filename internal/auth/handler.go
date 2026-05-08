@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"femProjectSqlc/internal/store"
@@ -9,6 +10,7 @@ import (
 	"femProjectSqlc/internal/validation"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -20,14 +22,20 @@ var (
 )
 
 type Handler struct {
-	userStore  store.UserStoreInterface
-	tokenStore store.TokenStoreInterface
+	userStore           store.UserStoreInterface
+	tokenStore          store.TokenStoreInterface
+	requestSessionStore store.RequestSessionStoreInterface
 }
 
-func NewHandler(userStore store.UserStoreInterface, tokenStore store.TokenStoreInterface) *Handler {
+func NewHandler(
+	userStore store.UserStoreInterface,
+	tokenStore store.TokenStoreInterface,
+	requestSessionStore store.RequestSessionStoreInterface,
+) *Handler {
 	return &Handler{
-		userStore:  userStore,
-		tokenStore: tokenStore,
+		userStore:           userStore,
+		tokenStore:          tokenStore,
+		requestSessionStore: requestSessionStore,
 	}
 }
 
@@ -85,6 +93,11 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	tokenPair, err := tokens.GenerateTokenPair(r.Context(), user.ID, h.tokenStore)
 	if err != nil {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error generating tokens")
+		return
+	}
+	if err := h.createRequestSession(r, user.ID, tokenPair.AccessToken); err != nil {
+		log.Printf("createRequestSession error: %v", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Error creating request session")
 		return
 	}
 
@@ -148,6 +161,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error generating tokens")
 		return
 	}
+	if err := h.createRequestSession(r, user.ID, tokenPair.AccessToken); err != nil {
+		log.Printf("createRequestSession error: %v", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Error creating request session")
+		return
+	}
 
 	utils.RespondWithJSON(w, http.StatusOK, AuthResponse{
 		AccessToken:  tokenPair.AccessToken,
@@ -169,9 +187,17 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithError(w, http.StatusUnauthorized, "Missing token")
 		return
 	}
+	if err := tokens.ValidateTokenPlaintext(tokenPlaintext); err != nil {
+		utils.RespondWithError(w, http.StatusUnauthorized, "Invalid token format")
+		return
+	}
 
 	tokenHash := tokens.HashToken(tokenPlaintext)
 	if err := h.tokenStore.DeleteTokenByHash(r.Context(), tokenHash); err != nil {
+		utils.RespondWithError(w, http.StatusInternalServerError, "Error logging out")
+		return
+	}
+	if err := h.requestSessionStore.RevokeRequestSessionByTokenHash(r.Context(), tokenHash); err != nil {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error logging out")
 		return
 	}
@@ -185,29 +211,26 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithError(w, http.StatusUnauthorized, "Missing refresh token")
 		return
 	}
+	if err := tokens.ValidateTokenPlaintext(refreshToken); err != nil {
+		utils.RespondWithError(w, http.StatusUnauthorized, "Invalid refresh token")
+		return
+	}
 
 	tokenHash := tokens.HashToken(refreshToken)
-	token, err := h.tokenStore.GetTokenByHash(r.Context(), tokenHash)
+	token, err := h.tokenStore.ConsumeValidRefreshTokenByHash(r.Context(), tokenHash)
 	if err != nil {
 		utils.RespondWithError(w, http.StatusUnauthorized, "Invalid refresh token")
 		return
 	}
 
-	if time.Now().After(token.Expiry) {
-		utils.RespondWithError(w, http.StatusUnauthorized, "Expired refresh token")
-		return
-	}
-
-	if token.Scope != tokens.ScopeRefresh {
-		utils.RespondWithError(w, http.StatusUnauthorized, "Invalid token scope")
-		return
-	}
-
-	h.tokenStore.DeleteTokenByHash(r.Context(), tokenHash)
-
 	tokenPair, err := tokens.GenerateTokenPair(r.Context(), token.UserID, h.tokenStore)
 	if err != nil {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error generating tokens")
+		return
+	}
+	if err := h.createRequestSession(r, token.UserID, tokenPair.AccessToken); err != nil {
+		log.Printf("createRequestSession error: %v", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Error creating request session")
 		return
 	}
 
@@ -217,4 +240,45 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		"token_type":    "Bearer",
 		"expires_in":    900,
 	})
+}
+
+func (h *Handler) createRequestSession(r *http.Request, userID int64, accessToken string) error {
+	tokenHash := tokens.HashToken(accessToken)
+	ipAddress := clientIPFromRequest(r)
+
+	_, err := h.requestSessionStore.CreateRequestSession(r.Context(), store.CreateRequestSessionParams{
+		UserID:           userID,
+		SessionTokenHash: tokenHash,
+		IPAddress:        toNullString(ipAddress),
+		UserAgent:        toNullString(r.UserAgent()),
+		ExpiresAt:        time.Now().Add(tokens.AccessTokenExpiry),
+	})
+	return err
+}
+
+func clientIPFromRequest(r *http.Request) string {
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+		parts := strings.Split(forwarded, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		return realIP
+	}
+
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil && host != "" {
+		return host
+	}
+	return strings.TrimSpace(r.RemoteAddr)
+}
+
+func toNullString(value string) sql.NullString {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: value, Valid: true}
 }

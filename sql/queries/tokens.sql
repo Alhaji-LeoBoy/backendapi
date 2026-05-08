@@ -57,3 +57,10 @@ WHERE user_id = ?1
   AND scope = ?2 
   AND expiry > datetime('now')
 LIMIT 1;
+
+-- name: ConsumeValidRefreshTokenByHash :one
+DELETE FROM tokens
+WHERE token_hash = ?1
+  AND scope = 'refresh'
+  AND expiry > datetime('now')
+RETURNING id, user_id, token_hash, scope, expiry, created_at;

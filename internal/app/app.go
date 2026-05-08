@@ -21,6 +21,7 @@ type Application struct {
 	Queries        *dbpkg.Queries
 	UserStore      store.UserStoreInterface
 	TokenStore     store.TokenStoreInterface
+	RequestSession store.RequestSessionStoreInterface
 	EventStore     store.EventStoreInterface
 	TicketStore    store.TicketStoreInterface
 	AuthHandler    *auth.Handler
@@ -54,6 +55,10 @@ func NewApplication(ctx context.Context, database *sql.DB, appCache *cache.InMem
 	if tokenStore == nil {
 		appLogger.Fatal("Failed to initialize TokenStore", nil)
 	}
+	requestSessionStore := store.NewRequestSessionStore(database, queries)
+	if requestSessionStore == nil {
+		appLogger.Fatal("Failed to initialize RequestSessionStore", nil)
+	}
 
 	eventStore := store.NewEventStore(database, queries)
 	if eventStore == nil {
@@ -80,14 +85,14 @@ func NewApplication(ctx context.Context, database *sql.DB, appCache *cache.InMem
 	imageQueue := queue.NewImageQueue(appCache)
 
 	// handlers & middleware
-	authHandler := auth.NewHandler(userStore, tokenStore)
+	authHandler := auth.NewHandler(userStore, tokenStore, requestSessionStore)
 	userHandler := handlers.NewUserHandler(userStore, eventStore, ticketStore, appLogger, appCache)
 	eventHandler := handlers.NewEventHandler(eventStore, appLogger, appCache)
 	ticketHandler := handlers.NewTicketHandler(ticketStore, eventStore, ticketSigner, appLogger, appCache)
 	adminHandler := handlers.NewAdminHandler(userStore, eventStore, ticketStore, appLogger)
 	paymentHandler := handlers.NewPaymentHandler(eventStore, ticketStore, transactionStore, ticketSigner, appLogger)
 	uploadHandler := handlers.NewUploadHandler(imageQueue, appLogger)
-	authMiddleware := middleware.New(tokenStore, appLogger)
+	authMiddleware := middleware.New(tokenStore, requestSessionStore, appLogger)
 
 	return &Application{
 		ctx:            ctx,
@@ -95,6 +100,7 @@ func NewApplication(ctx context.Context, database *sql.DB, appCache *cache.InMem
 		Queries:        queries,
 		UserStore:      userStore,
 		TokenStore:     tokenStore,
+		RequestSession: requestSessionStore,
 		EventStore:     eventStore,
 		TicketStore:    ticketStore,
 		Logger:         appLogger,

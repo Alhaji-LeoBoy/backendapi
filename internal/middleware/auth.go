@@ -20,14 +20,20 @@ type contextKey string
 const UserContextKey contextKey = "user"
 
 type Middleware struct {
-	tokenStore store.TokenStoreInterface
-	logger     *logger.Logger
+	tokenStore          store.TokenStoreInterface
+	requestSessionStore store.RequestSessionStoreInterface
+	logger              *logger.Logger
 }
 
-func New(tokenStore store.TokenStoreInterface, log *logger.Logger) *Middleware {
+func New(
+	tokenStore store.TokenStoreInterface,
+	requestSessionStore store.RequestSessionStoreInterface,
+	log *logger.Logger,
+) *Middleware {
 	return &Middleware{
-		tokenStore: tokenStore,
-		logger:     log,
+		tokenStore:          tokenStore,
+		requestSessionStore: requestSessionStore,
+		logger:              log,
 	}
 }
 
@@ -76,6 +82,9 @@ func (m *Middleware) ChiAuthenticate(next http.Handler) http.Handler {
 			m.logger.Error("Invalid token scope", nil)
 			respondWithError(w, http.StatusUnauthorized, "invalid token scope - access token required")
 			return
+		}
+		if err := m.requestSessionStore.TouchRequestSession(r.Context(), tokenHash); err != nil {
+			m.logger.Error("Failed to touch request session", err)
 		}
 
 		ctx := SetUserInContext(r.Context(), AuthenticatedUser{
@@ -187,6 +196,9 @@ func (m *Middleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 			respondWithError(w, http.StatusUnauthorized, "Invalid token scope - access token required")
 			return
 		}
+		if err := m.requestSessionStore.TouchRequestSession(r.Context(), tokenHash); err != nil {
+			m.logger.Error("Failed to touch request session", err)
+		}
 
 		ctx := SetUserInContext(r.Context(), AuthenticatedUser{
 			ID:        row.ID,
@@ -230,6 +242,9 @@ func (m *Middleware) OptionalAuth(next http.HandlerFunc) http.HandlerFunc {
 		if row.Scope != tokens.ScopeAccess {
 			next.ServeHTTP(w, r)
 			return
+		}
+		if err := m.requestSessionStore.TouchRequestSession(r.Context(), tokenHash); err != nil {
+			m.logger.Error("Failed to touch request session", err)
 		}
 
 		ctx := SetUserInContext(r.Context(), AuthenticatedUser{

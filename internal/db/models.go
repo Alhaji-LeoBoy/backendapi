@@ -23,6 +23,18 @@ type Event struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type RequestSession struct {
+	ID               int64          `json:"id"`
+	UserID           int64          `json:"user_id"`
+	SessionTokenHash []byte         `json:"session_token_hash"`
+	IpAddress        sql.NullString `json:"ip_address"`
+	UserAgent        sql.NullString `json:"user_agent"`
+	ExpiresAt        time.Time      `json:"expires_at"`
+	LastSeenAt       sql.NullTime   `json:"last_seen_at"`
+	CreatedAt        sql.NullTime   `json:"created_at"`
+	RevokedAt        sql.NullTime   `json:"revoked_at"`
+}
+
 type Ticket struct {
 	ID        int64     `json:"id"`
 	UserID    int64     `json:"user_id"`

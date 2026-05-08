@@ -23,6 +23,7 @@ type TokenStoreInterface interface {
 	CreateToken(userID int64, tokenHash []byte, expiry time.Time, scope string) (db.CreateTokenRow, error)
 	GetTokenByID(id int64) (db.GetTokenByIDRow, error)
 	GetTokenByHash(ctx context.Context, tokenHash []byte) (db.GetTokenByHashRow, error)
+	ConsumeValidRefreshTokenByHash(ctx context.Context, tokenHash []byte) (db.ConsumeValidRefreshTokenByHashRow, error)
 	GetUserByTokenHash(ctx context.Context, tokenHash []byte, scope string) (db.GetUserByTokenHashRow, error)
 	ListTokensForUser(ctx context.Context, userID int64) ([]db.ListTokensForUserRow, error)
 	DeleteToken(ctx context.Context, id int64) error
@@ -180,6 +181,25 @@ func (s *TokenStore) GetValidTokenByUserAndScope(ctx context.Context, userID int
 	})
 	if err != nil {
 		return db.GetValidTokenByUserAndScopeRow{}, err
+	}
+	return token, nil
+}
+
+func (s *TokenStore) ConsumeValidRefreshTokenByHash(ctx context.Context, tokenHash []byte) (db.ConsumeValidRefreshTokenByHashRow, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return db.ConsumeValidRefreshTokenByHashRow{}, err
+	}
+	defer tx.Rollback()
+
+	qtx := s.queries.WithTx(tx)
+	token, err := qtx.ConsumeValidRefreshTokenByHash(ctx, tokenHash)
+	if err != nil {
+		return db.ConsumeValidRefreshTokenByHashRow{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return db.ConsumeValidRefreshTokenByHashRow{}, err
 	}
 	return token, nil
 }

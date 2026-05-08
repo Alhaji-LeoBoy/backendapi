@@ -12,11 +12,13 @@ type Querier interface {
 	AdminDeleteEvent(ctx context.Context, id int64) error
 	AdminDeleteTicket(ctx context.Context, id int64) error
 	BatchGetUsers(ctx context.Context) ([]BatchGetUsersRow, error)
+	ConsumeValidRefreshTokenByHash(ctx context.Context, tokenHash []byte) (ConsumeValidRefreshTokenByHashRow, error)
 	CountActiveUsers(ctx context.Context) (int64, error)
 	CountEvents(ctx context.Context) (int64, error)
 	CountTickets(ctx context.Context) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
+	CreateRequestSession(ctx context.Context, arg CreateRequestSessionParams) (RequestSession, error)
 	CreateTicket(ctx context.Context, arg CreateTicketParams) (Ticket, error)
 	// ==================== Token CRUD ====================
 	CreateToken(ctx context.Context, arg CreateTokenParams) (CreateTokenRow, error)
@@ -25,6 +27,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteAllTokensForUser(ctx context.Context, userID int64) error
 	DeleteEvent(ctx context.Context, arg DeleteEventParams) error
+	DeleteExpiredOrRevokedRequestSessions(ctx context.Context) error
 	DeleteExpiredTokens(ctx context.Context) error
 	DeleteTicket(ctx context.Context, arg DeleteTicketParams) error
 	DeleteToken(ctx context.Context, id int64) error
@@ -36,6 +39,7 @@ type Querier interface {
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetEventTickets(ctx context.Context, eventID int64) ([]Ticket, error)
 	GetEventWithOwner(ctx context.Context, id int64) (GetEventWithOwnerRow, error)
+	GetRequestSessionByTokenHash(ctx context.Context, sessionTokenHash []byte) (RequestSession, error)
 	GetTicket(ctx context.Context, id int64) (Ticket, error)
 	GetTicketDetailed(ctx context.Context, id int64) (GetTicketDetailedRow, error)
 	GetTokenByHash(ctx context.Context, tokenHash []byte) (GetTokenByHashRow, error)
@@ -55,6 +59,7 @@ type Querier interface {
 	GetUserTransactions(ctx context.Context, userID int64) ([]GetUserTransactionsRow, error)
 	GetUserWithTokens(ctx context.Context, id int64) ([]GetUserWithTokensRow, error)
 	GetValidTokenByUserAndScope(ctx context.Context, arg GetValidTokenByUserAndScopeParams) (GetValidTokenByUserAndScopeRow, error)
+	ListActiveRequestSessionsForUser(ctx context.Context, userID int64) ([]RequestSession, error)
 	ListEvents(ctx context.Context, arg ListEventsParams) ([]Event, error)
 	ListEventsBetween(ctx context.Context, arg ListEventsBetweenParams) ([]Event, error)
 	ListEventsWithTicketStats(ctx context.Context) ([]ListEventsWithTicketStatsRow, error)
@@ -68,10 +73,13 @@ type Querier interface {
 	PatchTicket(ctx context.Context, arg PatchTicketParams) (Ticket, error)
 	PatchUser(ctx context.Context, arg PatchUserParams) (PatchUserRow, error)
 	RestoreUser(ctx context.Context, id int64) error
+	RevokeAllRequestSessionsForUser(ctx context.Context, userID int64) error
+	RevokeRequestSessionByTokenHash(ctx context.Context, sessionTokenHash []byte) error
 	SearchEvents(ctx context.Context, arg SearchEventsParams) ([]Event, error)
 	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
 	SetUserAdmin(ctx context.Context, arg SetUserAdminParams) error
 	SoftDeleteUser(ctx context.Context) error
+	TouchRequestSession(ctx context.Context, sessionTokenHash []byte) error
 	UpdateEmail(ctx context.Context, arg UpdateEmailParams) error
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
 	UpdateTransactionTicketID(ctx context.Context, arg UpdateTransactionTicketIDParams) error

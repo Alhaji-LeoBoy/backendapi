@@ -155,15 +155,16 @@ func TestEventStore_ListEventsWithTicketStats(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 
 	now := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
-	statsCols := append(eventCols, "tickets_count", "revenue")
+	statsCols := append(eventCols, "tickets_count", "unique_users_count", "revenue")
 	mock.ExpectQuery(regexp.QuoteMeta("LEFT JOIN tickets")).
 		WillReturnRows(sqlmock.NewRows(statsCols).
-			AddRow(1, 1, "Event A", "alice", "desc", "loc", now, "", 0.0, now, now, 10, 499.90))
+			AddRow(1, 1, "Event A", "alice", "desc", "loc", now, "", 0.0, now, now, 10, 4, 499.90))
 
 	rows, err := s.ListEventsWithTicketStats(context.Background())
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, int64(10), rows[0].TicketsCount)
+	assert.Equal(t, int64(4), rows[0].UniqueUsersCount)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

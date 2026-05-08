@@ -46,3 +46,12 @@ func newTokenStore(t *testing.T) (*store.TokenStore, *sql.DB, sqlmock.Sqlmock) {
 	s := store.NewTokenStore(db, queries)
 	return s, db, mock
 }
+
+func newRequestSessionStore(t *testing.T) (*store.RequestSessionStore, *sql.DB, sqlmock.Sqlmock) {
+	t.Helper()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	queries := dbpkg.New(db)
+	s := store.NewRequestSessionStore(db, queries)
+	return s, db, mock
+}

@@ -7,12 +7,14 @@ sql:
       - "sql/schema/schema_events.sql"
       - "sql/schema/schema_tickets.sql"
       - "sql/schema/schema_transactions.sql"
+      - "sql/schema/schema_request_sessions.sql"
     queries:
       - "sql/queries/users.sql"
       - "sql/queries/tokens.sql"
       - "sql/queries/events.sql"
       - "sql/queries/tickets.sql"
       - "sql/queries/transactions.sql"
+      - "sql/queries/request_sessions.sql"
     gen:
       go:
         package: "db"

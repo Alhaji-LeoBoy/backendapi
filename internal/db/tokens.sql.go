@@ -11,6 +11,37 @@ import (
 	"time"
 )
 
+const consumeValidRefreshTokenByHash = `-- name: ConsumeValidRefreshTokenByHash :one
+DELETE FROM tokens
+WHERE token_hash = ?1
+  AND scope = 'refresh'
+  AND expiry > datetime('now')
+RETURNING id, user_id, token_hash, scope, expiry, created_at
+`
+
+type ConsumeValidRefreshTokenByHashRow struct {
+	ID        int64        `json:"id"`
+	UserID    int64        `json:"user_id"`
+	TokenHash []byte       `json:"token_hash"`
+	Scope     string       `json:"scope"`
+	Expiry    time.Time    `json:"expiry"`
+	CreatedAt sql.NullTime `json:"created_at"`
+}
+
+func (q *Queries) ConsumeValidRefreshTokenByHash(ctx context.Context, tokenHash []byte) (ConsumeValidRefreshTokenByHashRow, error) {
+	row := q.db.QueryRowContext(ctx, consumeValidRefreshTokenByHash, tokenHash)
+	var i ConsumeValidRefreshTokenByHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.Scope,
+		&i.Expiry,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createToken = `-- name: CreateToken :one
 
 INSERT INTO tokens (user_id, token_hash, expiry, scope)

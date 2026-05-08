@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -76,16 +77,34 @@ func (c *InMemoryCache) Delete(ctx context.Context, key string) {
 
 // simple pattern delete (prefix-based, not full Redis glob)
 func (c *InMemoryCache) DeleteByPattern(ctx context.Context, pattern string) error {
+	prefix := normalizePatternPrefix(pattern)
+	if prefix == "" {
+		return nil
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	for k := range c.store {
-		// simple prefix match
-		if len(k) >= len(pattern)-1 && k[:len(pattern)-1] == pattern[:len(pattern)-1] {
+		if strings.HasPrefix(k, prefix) {
 			delete(c.store, k)
 		}
 	}
 	return nil
+}
+
+func normalizePatternPrefix(pattern string) string {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return ""
+	}
+
+	// Support both "events:*" and direct prefixes like "tickets:".
+	if strings.HasSuffix(pattern, "*") {
+		return strings.TrimSuffix(pattern, "*")
+	}
+
+	return pattern
 }
 
 // -------------------- JSON --------------------
